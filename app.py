@@ -1,7 +1,7 @@
-app.py
 from flask import Flask, request, jsonify
-import anthropic
+from groq import Groq
 import os
+import base64
 
 app = Flask(__name__)
 
@@ -14,10 +14,11 @@ def analyze_text():
     data = request.json
     stock = data.get('stock', 'Unknown')
     candles = data.get('candles', 'No data')
-    claude = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_KEY"))
-    message = claude.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=500,
+    
+    client = Groq(api_key=os.environ.get("GROQ_KEY"))
+    
+    response = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
         messages=[{
             "role": "user",
             "content": f"""You are CandleIQ, expert Indian stock analyzer.
@@ -30,27 +31,27 @@ Give me:
 4. Verdict: INVEST ✅ / SKIP ❌ / WATCH 👀
 5. One line reason
 User manages their own financial risk."""
-        }]
+        }],
+        max_tokens=500
     )
-    return jsonify({"result": message.content[0].text})
+    return jsonify({"result": response.choices[0].message.content})
 
 @app.route('/analyze-image', methods=['POST'])
 def analyze_image():
     data = request.json
     image_base64 = data.get('image')
-    claude = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_KEY"))
-    message = claude.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=500,
+    
+    client = Groq(api_key=os.environ.get("GROQ_KEY"))
+    
+    response = client.chat.completions.create(
+        model="llama-3.2-11b-vision-preview",
         messages=[{
             "role": "user",
             "content": [
                 {
-                    "type": "image",
-                    "source": {
-                        "type": "base64",
-                        "media_type": "image/png",
-                        "data": image_base64
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/png;base64,{image_base64}"
                     }
                 },
                 {
@@ -64,9 +65,10 @@ def analyze_image():
 User manages their own financial risk."""
                 }
             ]
-        }]
+        }],
+        max_tokens=500
     )
-    return jsonify({"result": message.content[0].text})
+    return jsonify({"result": response.choices[0].message.content})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=10000)
